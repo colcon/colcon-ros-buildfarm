@@ -1,8 +1,11 @@
 apache
 buildfarm
 colcon
+https
 iterdir
+linter
 pathlib
+pycqa
 pytest
 scott
 scspell
