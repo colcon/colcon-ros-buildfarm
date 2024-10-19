@@ -101,18 +101,22 @@ class LocalDebRepositoryExtension(LocalRepositoryExtensionPoint):
     def initialize(self, base_path, os_name, os_code_name, arch):  # noqa: D102
         os_dir = base_path / os_name
         dist_dir = os_dir / 'dists' / os_code_name
+        force_update = False
 
         source_md_file = dist_dir / 'main' / 'source' / 'Sources'
         if not source_md_file.is_file():
             source_md_file.parent.mkdir(parents=True, exist_ok=True)
             source_md_file.touch()
+            force_update = True
 
         arch_md_file = dist_dir / 'main' / ('binary-' + arch) / 'Packages'
         if not arch_md_file.is_file():
             arch_md_file.parent.mkdir(parents=True, exist_ok=True)
             arch_md_file.touch()
+            force_update = True
 
-        _generate_release(os_dir, os_code_name)
+        if not (dist_dir / 'Release').is_file() or force_update:
+            _generate_release(os_dir, os_code_name)
 
     async def import_source(  # noqa: D102
         self, base_path, os_name, os_code_name, artifact_path

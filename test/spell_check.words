@@ -55,6 +55,7 @@ sourcepkg
 srpms
 strftime
 surrogatepass
+tempfile
 thomas
 traceback
 urllib
