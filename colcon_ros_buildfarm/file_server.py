@@ -70,14 +70,16 @@ class SimpleFileServer:
         self._directory = directory
         self._thread = Thread(target=self._run)
 
-    def start(self):
+    def start(self, port=None):
         """
         Start the server thread.
 
         :returns: The hostname and port to connect to
         """
+        if port is None:
+            port = 0
         self._server = TCPServer(
-            ('127.0.0.1', 0),
+            ('127.0.0.1', port),
             partial(_SimpleHTTPRequestHandler, directory=self._directory))
         self._thread.start()
         host, port = self._server.socket.getsockname()

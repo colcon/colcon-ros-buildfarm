@@ -41,15 +41,13 @@ class MissingFromRepoPackageSelection(
 ):
     """Select packages which are missing from the target repository."""
 
-    PRIORITY = 10
-
     def __init__(self):  # noqa: D107
         super().__init__()
         satisfies_version(
             PackageSelectionExtensionPoint.EXTENSION_POINT_VERSION, '^1.0')
         satisfies_version(
             ConfigAugmentationExtensionPoint.EXTENSION_POINT_VERSION, '^1.0')
-        self._in_repo = None
+        self._index_url = None
 
     def add_arguments(self, *, parser):  # noqa: D102
         parser.add_argument(
@@ -58,19 +56,18 @@ class MissingFromRepoPackageSelection(
                  'present in the buildfarm target repository')
 
     def augment_config(self, index_path, args):  # noqa: D102
-        if not getattr(args, 'packages_select_missing_from_repo', False):
-            return
-
-        index_url = index_path.resolve().as_uri()
-        self._in_repo = _get_packages_in_repo(
-            index_url, args.ros_distro, args.build_name)
+        self._index_url = index_path.resolve().as_uri()
 
     def select_packages(self, args, decorators):  # noqa: D102
-        if not self._in_repo:
+        if not getattr(args, 'packages_select_missing_from_repo', False):
+            return
+        if not self._index_url:
             return
 
+        in_repo = _get_packages_in_repo(
+            self._index_url, args.ros_distro, args.build_name)
         for decorator in decorators:
             pkg_name = get_os_package_name(
                 args.ros_distro, decorator.descriptor.name)
-            if pkg_name in self._in_repo:
+            if pkg_name in in_repo:
                 decorator.selected = False

@@ -43,7 +43,8 @@ class LocalRpmRepositoryExtension(LocalRepositoryExtensionPoint):
             subprocess.check_call([
                 sys.executable, '-c',
                 'import createrepo_c; createrepo_c.createrepo_c()',
-                '--no-database', str(repo_dir)])
+                '--quiet', '--no-database', '--general-compress-type=gz',
+                str(repo_dir)])
 
     async def import_source(  # noqa: D102
         self, base_path, os_name, os_code_name, artifact_path
@@ -113,7 +114,8 @@ class LocalRpmRepositoryExtension(LocalRepositoryExtensionPoint):
         args = [
             sys.executable, '-c',
             'import createrepo_c; createrepo_c.createrepo_c()',
-            '--no-database', '--update', str(repo_dir),
+            '--quiet', '--no-database', '--update',
+            '--general-compress-type=gz', str(repo_dir),
         ]
         res = await run(args, None, None)
         res.check_returncode()

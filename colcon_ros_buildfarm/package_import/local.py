@@ -1,6 +1,7 @@
 # Copyright 2022 Scott K Logan
 # Licensed under the Apache License, Version 2.0
 
+import argparse
 import os
 from pathlib import Path
 
@@ -37,7 +38,7 @@ class LocalPackageImportExtension(
             PackageImportExtensionPoint.EXTENSION_POINT_VERSION, '^1.0')
         self._server = None
 
-    def _set_up_server(self, repo_base, target_platforms):
+    def _set_up_server(self, repo_base, target_platforms, port):
         for os_name, os_code_name, arch in target_platforms:
             extension = select_local_repository_extension(os_name)
             if extension is None:
@@ -45,31 +46,17 @@ class LocalPackageImportExtension(
             extension.initialize(repo_base, os_name, os_code_name, arch)
 
         self._server = SimpleFileServer(str(repo_base))
-        host, port = self._server.start()
+        host, port = self._server.start(port=port)
 
         return host, port
 
     def augment_config(self, index_path, args):  # noqa: D102
         if (
             getattr(args, 'package_import', None) != 'local' or
-            getattr(args, 'target_platform', None) is None
-        ):
-            return
-
-        host, port = self._set_up_server(
-            Path(args.repo_base), args.target_platform)
-
-        if (
             getattr(args, 'build_name', None) is None or
             getattr(args, 'ros_distro', None) is None
         ):
             return
-
-        # This appears to be a general limitation of ros_buildfarm build files
-        os_names = {target[0] for target in args.target_platform}
-        assert len(os_names) == 1, 'A build file can support only a single OS'
-        os_name = next(iter(os_names))
-        repo_url = f'http://{host}:{port}/{os_name}'
 
         with index_path.open('r') as f:
             index_data = yaml.safe_load(f)
@@ -81,11 +68,26 @@ class LocalPackageImportExtension(
         with build_file_path.open('r') as f:
             build_file_data = yaml.safe_load(f)
 
+        targets = []
+        for os_name, target in build_file_data['targets'].items():
+            for os_code_name, arches in target.items():
+                for arch in arches:
+                    targets.append((os_name, os_code_name, arch))
+            break
+        else:
+            # This appears to be a general limitation of ros_buildfarm
+            # build files
+            assert False, 'A build file can only support a single OS'
+
         repositories = build_file_data.setdefault('repositories', {})
         repo_keys = repositories.setdefault('keys', [])
         repo_urls = repositories.setdefault('urls', [])
 
         repo_keys.insert(0, '')
+
+        host, port = self._set_up_server(
+            Path(args.repo_base), targets, args.repo_server_port)
+        repo_url = f'http://{host}:{port}/{os_name}'
         if os_name in ('fedora', 'rhel'):
             repo_urls.insert(0, repo_url + '/$releasever/$basearch')
         else:
@@ -106,6 +108,10 @@ class LocalPackageImportExtension(
             default=wrap_default_value('repo'),
             help='The base path for locally importing built packages '
                  '(default: repo)')
+        parser.add_argument(
+            '--repo-server-port',
+            type=int, default=0,
+            help=argparse.SUPPRESS)
 
     async def import_source(  # noqa: D102
         self, args, os_name, os_code_name, artifact_path

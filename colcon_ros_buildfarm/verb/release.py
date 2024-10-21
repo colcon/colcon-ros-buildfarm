@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0
 
 from collections import OrderedDict
+import logging
 import os
 from pathlib import Path
 
@@ -14,6 +15,8 @@ from colcon_core.executor import add_executor_arguments
 from colcon_core.executor import execute_jobs
 from colcon_core.executor import Job
 from colcon_core.executor import OnError
+from colcon_core.logging import colcon_logger
+from colcon_core.logging import get_effective_console_level
 from colcon_core.package_identification.ignore import IGNORE_MARKER
 from colcon_core.plugin_system import satisfies_version
 from colcon_core.task import add_task_arguments
@@ -30,6 +33,9 @@ from colcon_ros_buildfarm.package_import \
 from colcon_ros_buildfarm.package_selection \
     import add_arguments as add_packages_arguments
 from colcon_ros_buildfarm.package_selection import get_packages
+from ros_buildfarm.config import get_index
+from ros_buildfarm.config import get_release_build_files
+
 
 DEFAULT_CONFIG_URL = 'https://raw.githubusercontent.com' \
     '/ros2/ros_buildfarm_config/ros2/index.yaml'
@@ -82,6 +88,18 @@ def platform_argument(value):
     return tuple(value.split(':', 2))
 
 
+def _get_targets(config, ros_distro, release_name):
+    build_files = get_release_build_files(config, ros_distro)
+    build_file = build_files[release_name]
+
+    targets = []
+    for os_name, os_code_names in build_file.targets.items():
+        for os_code_name, arches in os_code_names.items():
+            for arch in arches:
+                targets.append((os_name, os_code_name, arch))
+    return targets
+
+
 def _get_source_job_id(pkg_name, ros_distro, args):
     ros_distro_prefix = ros_distro[0].upper()
     prefix = f'{ros_distro_prefix}src'
@@ -132,7 +150,7 @@ class RosBuildfarmReleaseVerb(VerbExtensionPoint):
             '--target-platform',
             metavar='OS:VERSION:ARCH',
             type=platform_argument,
-            nargs='+', required=True)
+            nargs='*')
 
         add_executor_arguments(parser)
         add_event_handler_arguments(parser)
@@ -146,6 +164,9 @@ class RosBuildfarmReleaseVerb(VerbExtensionPoint):
         self.extra_argument_destinations = decorated_parser.get_destinations()
 
     def main(self, *, context):  # noqa: D102
+        log_level = get_effective_console_level(colcon_logger)
+        logging.getLogger('ros_buildfarm').setLevel(log_level)
+
         check_and_mark_build_tool(context.args.build_base)
 
         self._create_path(context.args.build_base)
@@ -155,6 +176,12 @@ class RosBuildfarmReleaseVerb(VerbExtensionPoint):
             config_path, context.args.ros_distro, context.args.build_name,
             args=context.args, upstream_config_url=context.args.config_url)
         context.args.config_url = augmented_config_url
+
+        config = get_index(context.args.config_url)
+        os.environ['ROSDISTRO_INDEX_URL'] = config.rosdistro_index_url
+        if context.args.target_platform is None:
+            context.args.target_platform = _get_targets(
+                config, context.args.ros_distro, context.args.build_name)
 
         decorators = get_packages(
             context.args,

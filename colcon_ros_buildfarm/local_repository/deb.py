@@ -103,16 +103,28 @@ class LocalDebRepositoryExtension(LocalRepositoryExtensionPoint):
         dist_dir = os_dir / 'dists' / os_code_name
         force_update = False
 
-        source_md_file = dist_dir / 'main' / 'source' / 'Sources'
-        if not source_md_file.is_file():
-            source_md_file.parent.mkdir(parents=True, exist_ok=True)
-            source_md_file.touch()
+        src_md_file = dist_dir / 'main' / 'source' / 'Sources'
+        if not src_md_file.is_file():
+            src_md_file.parent.mkdir(parents=True, exist_ok=True)
+            src_md_file.touch()
+            force_update = True
+        src_md_gz_file = src_md_file.with_suffix(src_md_file.suffix + '.gz')
+        if not src_md_gz_file.is_file():
+            with src_md_file.open('r') as src_md:
+                with src_md_gz_file.open('w') as src_md_gz:
+                    shutil.copyfileobj(src_md, src_md_gz)
             force_update = True
 
         arch_md_file = dist_dir / 'main' / ('binary-' + arch) / 'Packages'
         if not arch_md_file.is_file():
             arch_md_file.parent.mkdir(parents=True, exist_ok=True)
             arch_md_file.touch()
+            force_update = True
+        arch_md_gz_file = arch_md_file.with_suffix(arch_md_file.suffix + '.gz')
+        if not arch_md_gz_file.is_file():
+            with arch_md_file.open('r') as arch_md:
+                with arch_md_gz_file.open('w') as arch_md_gz:
+                    shutil.copyfileobj(arch_md, arch_md_gz)
             force_update = True
 
         if not (dist_dir / 'Release').is_file() or force_update:
