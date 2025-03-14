@@ -46,7 +46,7 @@ def _copy_to_pool(pool_dir, path):
 
 def _generate_release(os_dir, os_code_name):
     dist_dir = os_dir / 'dists' / os_code_name
-    now = datetime.datetime.now(datetime.UTC).strftime(
+    now = datetime.datetime.now(datetime.timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S %Z')
     package_files = sorted(
         list(dist_dir.glob('main/*/Packages*')) +
@@ -63,21 +63,21 @@ def _generate_release(os_dir, os_code_name):
         release.write('MD5Sum:\n')
         for package_file in package_files:
             with package_file.open('rb') as file:
-                digest = hashlib.file_digest(file, 'md5')
+                digest = hashlib.md5(file.read())
             release.write(f' {digest.hexdigest()}')
             release.write(f' {package_file.stat().st_size}')
             release.write(f' {package_file.relative_to(dist_dir)}\n')
         release.write('SHA1:\n')
         for package_file in package_files:
             with package_file.open('rb') as file:
-                digest = hashlib.file_digest(file, 'sha1')
+                digest = hashlib.sha1(file.read())
             release.write(f' {digest.hexdigest()}')
             release.write(f' {package_file.stat().st_size}')
             release.write(f' {package_file.relative_to(dist_dir)}\n')
         release.write('SHA256:\n')
         for package_file in package_files:
             with package_file.open('rb') as file:
-                digest = hashlib.file_digest(file, 'sha256')
+                digest = hashlib.sha256(file.read())
             release.write(f' {digest.hexdigest()}')
             release.write(f' {package_file.stat().st_size}')
             release.write(f' {package_file.relative_to(dist_dir)}\n')
